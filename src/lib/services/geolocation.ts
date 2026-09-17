@@ -91,8 +91,9 @@ export async function geolocateIP(ip: string, expectedCountry: string = 'US'): P
     }
   }
 
-  // Check built-in demo cache if offline
-  if (INITIAL_GEO_CACHE[cleanIp]) {
+  // Check built-in demo cache ONLY for the known demo IPs (not for real EML IPs)
+  const DEMO_IPS = ['103.253.144.18', '185.220.101.5', '198.51.100.42'];
+  if (DEMO_IPS.includes(cleanIp) && INITIAL_GEO_CACHE[cleanIp]) {
     return {
       success: true,
       data: INITIAL_GEO_CACHE[cleanIp],
@@ -107,14 +108,21 @@ export async function geolocateIP(ip: string, expectedCountry: string = 'US'): P
     : `https://ipinfo.io/${encodeURIComponent(cleanIp)}/json`;
 
   try {
+    // AbortController for 5-second timeout so the page doesn't hang
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     const res = await fetch(url, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
         'User-Agent': 'AEGIS-TRACE-Forensics/1.0',
       },
-      next: { revalidate: 3600 * 24 }, // Next.js fetch cache 24 hours
+      cache: 'no-store', // Always fetch live — never serve stale geolocation from Vercel cache
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     if (!res.ok) {
       throw new Error(`ipinfo HTTP ${res.status}: ${res.statusText}`);

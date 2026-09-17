@@ -90,8 +90,15 @@ export function formatCooldown(ms: number): string {
 
 // --- safeSignUp --------------------------------------------------------------
 
+/** Standard email format validator — accepts any TLD like gmail.com, yahoo.co.in, etc. */
+function isValidEmail(email: string): boolean {
+  // RFC-5321 compatible: local@domain.tld  (TLD 2–6 chars, no internal-only restriction)
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
+}
+
 /**
  * Wraps `supabase.auth.signUp` with:
+ *  - Client-side email format validation
  *  - Client-side cooldown check
  *  - Rate limit error detection
  *  - Typed result with `rateLimited` and `sessionReady` flags
@@ -101,6 +108,17 @@ export async function safeSignUp(
   email: string,
   password: string
 ): Promise<SafeSignUpResult> {
+  // Validate email format before any network call
+  if (!isValidEmail(email)) {
+    return {
+      userId: null,
+      sessionReady: false,
+      needsEmailConfirmation: false,
+      rateLimited: false,
+      error: `Invalid email address. Please use a standard format like name@gmail.com`,
+    };
+  }
+
   // Client-side gate: don't even attempt if browser-local cooldown is active
   const cooldown = getEmailCooldownRemaining();
   if (cooldown > 0) {
@@ -116,11 +134,10 @@ export async function safeSignUp(
   try {
     const { data, error } = await supabase.auth.signUp({ email, password });
 
-    // Record the attempt timestamp regardless of outcome
-    setTimestamp(LS_LAST_SIGNUP_KEY);
-
     if (error) {
       const rateLimited = isEmailRateLimitError(error);
+      // Only set cooldown timestamp on rate-limit/failure — NOT on success
+      if (rateLimited) setTimestamp(LS_LAST_SIGNUP_KEY);
       return {
         userId: null,
         sessionReady: false,
@@ -138,6 +155,7 @@ export async function safeSignUp(
     // If user exists but no session -> email confirmation is required
     const needsEmailConfirmation = !!userId && !sessionReady;
 
+    // SUCCESS — do NOT set cooldown timestamp so user can register again immediately
     return {
       userId,
       sessionReady,
@@ -147,6 +165,7 @@ export async function safeSignUp(
     };
   } catch (err: unknown) {
     const rateLimited = isEmailRateLimitError(err);
+    if (rateLimited) setTimestamp(LS_LAST_SIGNUP_KEY);
     return {
       userId: null,
       sessionReady: false,
