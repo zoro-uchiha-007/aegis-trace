@@ -1,4 +1,4 @@
-﻿/**
+/**
  * RFC-822 / MIME Email Parser for Aegis-Trace Cyber Forensics
  * Parses raw .eml file content, headers, MIME boundaries, plain/HTML body,
  * links, attachments, and extracts all network hop relays from Received headers.
@@ -51,7 +51,8 @@ export interface ParsedEmailData {
 
   // Extracted Relays & IPs
   hops: ParsedReceivedHop[];
-  originIp?: string;
+  originIp?: string;        // First public IP found (origin hop)
+  publicIPs: string[];      // All unique public IPs across all Received headers
 
   // Body & Content
   bodyText: string;
@@ -103,6 +104,26 @@ function parseEmailAddress(raw: string): { name: string; address: string; domain
  * IPv4 regex matching
  */
 const IPV4_REGEX = /\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/;
+
+/**
+ * Returns true if the IP is a private/loopback/reserved address that
+ * should NOT be geolocated (RFC1918, loopback, link-local, etc.).
+ */
+function isPrivateOrReservedIP(ip: string): boolean {
+  if (!ip) return true;
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((p) => isNaN(p))) return true;
+  const [a, b] = parts;
+  return (
+    a === 10 ||                          // 10.0.0.0/8
+    a === 127 ||                         // 127.0.0.0/8 loopback
+    (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
+    (a === 192 && b === 168) ||          // 192.168.0.0/16
+    (a === 169 && b === 254) ||          // 169.254.0.0/16 link-local
+    a === 0 ||                           // 0.0.0.0/8
+    a >= 240                             // 240.0.0.0/4 reserved
+  );
+}
 
 /**
  * Simple SHA-256 string hash generator for forensic demo / checksum simulation
@@ -157,28 +178,34 @@ export function parseEml(rawContent: string): ParsedEmailData {
   const reversedReceived = [...receivedHeaders].reverse();
   
   let hopIndex = 1;
+  const seenIPs = new Set<string>(); // dedupe identical IPs across hops
+
   for (const r of reversedReceived) {
-    const ipMatch = r.match(IPV4_REGEX);
-    const ip = ipMatch ? ipMatch[0] : '';
-    
+    // Find all IPv4 addresses in this Received header
+    const allIpMatches = r.match(new RegExp(IPV4_REGEX.source, 'g')) || [];
+    // Pick the first non-private IP found in this header
+    const ip = allIpMatches.find((candidate) => !isPrivateOrReservedIP(candidate)) || '';
+
     // Extract 'from' part and 'by' part
     const fromMatch = r.match(/from\s+([^\s;]+)/i);
     const byMatch = r.match(/by\s+([^\s;]+)/i);
     const withMatch = r.match(/with\s+([^\s;]+)/i);
     const dateMatch = r.match(/;\s*(.+)$/);
 
-    const fromHost = fromMatch ? fromMatch[1] : (ip || 'unknown-origin');
+    const fromHost = fromMatch ? fromMatch[1] : (ip || 'unknown-relay');
     const byHost = byMatch ? byMatch[1] : 'internal-relay';
     const protocol = withMatch ? withMatch[1] : 'ESMTP';
     const timestamp = dateMatch ? dateMatch[1].trim() : new Date().toUTCString();
 
-    if (ip || fromHost) {
+    // Only add hops that have a valid public IP and haven't been seen yet
+    if (ip && !seenIPs.has(ip)) {
+      seenIPs.add(ip);
       hops.push({
         hopNumber: hopIndex,
         fromRaw: fromHost,
         byRaw: byHost,
         withProtocol: protocol,
-        ip: ip || '103.253.144.18',
+        ip,
         timestamp,
         isAnomalous: hopIndex === 1, // Origin hop flagged if unverified
         relayLabel: `${fromHost} → ${byHost}`,
@@ -187,19 +214,15 @@ export function parseEml(rawContent: string): ParsedEmailData {
     }
   }
 
-  // If no hops were found in headers, provide standard parsed origin
-  if (hops.length === 0) {
-    hops.push({
-      hopNumber: 1,
-      fromRaw: fromParsed.domain || 'origin.mail-host.net',
-      byRaw: 'mx.destination-gateway.com',
-      withProtocol: 'ESMTPS',
-      ip: '103.253.144.18',
-      timestamp: new Date().toUTCString(),
-      isAnomalous: true,
-      relayLabel: `Origin [${fromParsed.domain || 'unknown'}]`,
-    });
-  }
+  // Collect all unique public IPs found across all Received headers
+  const allReceivedText = receivedHeaders.join(' ');
+  const allIPMatches = allReceivedText.match(new RegExp(IPV4_REGEX.source, 'g')) || [];
+  const publicIPs = Array.from(
+    new Set(allIPMatches.filter((ip) => !isPrivateOrReservedIP(ip)))
+  );
+
+  // If no hops with public IPs were found, return empty — never fabricate an IP
+  // The UI will show "No public IPs found in Received headers" state.
 
   // Parse Body text and URLs
   let bodyText = bodySection;
@@ -272,7 +295,8 @@ export function parseEml(rawContent: string): ParsedEmailData {
     dmarcVerdictHeader: headers['dmarc-filter'] || headers['x-dmarc-info'],
 
     hops,
-    originIp: hops[0]?.ip,
+    originIp: hops[0]?.ip || undefined,
+    publicIPs,
     bodyText,
     bodyHtml,
     extractedUrls,

@@ -1,73 +1,82 @@
-import { IPGeolocationRecord } from '../supabase/types';
+﻿import { IPGeolocationRecord } from '../supabase/types';
 import { getSupabaseServerClient } from '../supabase/server';
 import { isPrivateOrReservedIP } from '../utils/geo-math';
-import { INITIAL_GEO_CACHE } from './demo-data';
 
 export interface GeoLookupResult {
   success: boolean;
   data?: IPGeolocationRecord;
   error?: string;
-  source: 'cache' | 'ipinfo' | 'fallback';
+  locationUnavailable?: boolean;
+  source: 'cache' | 'ipinfo' | 'unavailable';
 }
 
-/**
- * Normalizes and splits the 'org' string from ipinfo (e.g. "AS13335 Cloudflare, Inc.")
- */
+function isValidCoordinate(lat: number, lng: number): boolean {
+  if (typeof lat !== 'number' || typeof lng !== 'number') return false;
+  if (isNaN(lat) || isNaN(lng)) return false;
+  if (lat < -90 || lat > 90) return false;
+  if (lng < -180 || lng > 180) return false;
+  if (lat === 0 && lng === 0) return false;
+  return true;
+}
+
+function logGeoDebug(info: {
+  requestedIP: string;
+  resolvedIP?: string;
+  lat?: number;
+  lng?: number;
+  city?: string;
+  country?: string;
+  provider: string;
+  status: 'hit' | 'miss' | 'error' | 'invalid_coords' | 'private';
+}) {
+  console.log(
+    `[AEGIS-GEO] ${new Date().toISOString()} | ` +
+    `Requested IP: ${info.requestedIP} | ` +
+    `Resolved IP: ${info.resolvedIP ?? 'N/A'} | ` +
+    `Latitude: ${info.lat ?? 'N/A'} | ` +
+    `Longitude: ${info.lng ?? 'N/A'} | ` +
+    `City: ${info.city ?? 'N/A'} | ` +
+    `Country: ${info.country ?? 'N/A'} | ` +
+    `Provider: ${info.provider} | ` +
+    `Status: ${info.status}`
+  );
+}
+
 function parseASNAndISP(orgString?: string): { asn: string; isp: string } {
   if (!orgString) return { asn: 'AS-UNKNOWN', isp: 'Unknown Provider' };
-  
   const trimmed = orgString.trim();
   const spaceIdx = trimmed.indexOf(' ');
-  
   if (spaceIdx > 0 && trimmed.toUpperCase().startsWith('AS')) {
-    const asn = trimmed.substring(0, spaceIdx);
-    const isp = trimmed.substring(spaceIdx + 1);
-    return { asn, isp };
+    return { asn: trimmed.substring(0, spaceIdx), isp: trimmed.substring(spaceIdx + 1) };
   }
-  
   return { asn: 'AS-N/A', isp: trimmed };
 }
 
 /**
- * Core Geolocation service function.
- * 1. Checks 30-day Supabase cache.
- * 2. Queries ipinfo.io REST API server-side.
- * 3. Upserts result into cache.
- * 4. Gracefully handles private/malformed IPs.
+ * Resolves an IP to geolocation via ipinfo.io.
+ * NEVER returns hardcoded/fake coordinates on failure.
+ * Returns locationUnavailable: true instead.
  */
-export async function geolocateIP(ip: string, expectedCountry: string = 'US'): Promise<GeoLookupResult> {
+export async function geolocateIP(
+  ip: string,
+  expectedCountry: string = 'IN'
+): Promise<GeoLookupResult> {
   const cleanIp = (ip || '').trim();
 
   if (!cleanIp) {
+    return { success: false, error: 'Empty IP address provided', locationUnavailable: true, source: 'unavailable' };
+  }
+
+  if (isPrivateOrReservedIP(cleanIp)) {
+    logGeoDebug({ requestedIP: cleanIp, provider: 'none', status: 'private' });
     return {
       success: false,
-      error: 'Empty IP address provided',
-      source: 'fallback',
+      error: `${cleanIp} is a private/reserved IP — geolocation not applicable.`,
+      locationUnavailable: true,
+      source: 'unavailable',
     };
   }
 
-  // 1. Check for private/reserved IP ranges
-  if (isPrivateOrReservedIP(cleanIp)) {
-    const localRecord: IPGeolocationRecord = {
-      id: `priv-${cleanIp}`,
-      ip: cleanIp,
-      lat: 38.9072,
-      lng: -77.0369,
-      city: 'Local Network / VPC',
-      region: 'Internal',
-      country: 'Private Network',
-      country_code: 'LAN',
-      asn: 'AS-INTERNAL',
-      isp: 'RFC1918 Private Enclave',
-      org: 'Internal Network',
-      timezone: 'UTC',
-      is_anomalous: false,
-      looked_up_at: new Date().toISOString(),
-    };
-    return { success: true, data: localRecord, source: 'cache' };
-  }
-
-  // 2. Check Database Cache (< 30 days old)
   const supabase = getSupabaseServerClient();
   if (supabase) {
     try {
@@ -80,85 +89,78 @@ export async function geolocateIP(ip: string, expectedCountry: string = 'US'): P
         .single();
 
       if (cached && !error) {
-        return {
-          success: true,
-          data: cached as IPGeolocationRecord,
-          source: 'cache',
-        };
+        if (isValidCoordinate(cached.lat, cached.lng)) {
+          logGeoDebug({
+            requestedIP: cleanIp, resolvedIP: cached.ip,
+            lat: cached.lat, lng: cached.lng,
+            city: cached.city, country: cached.country,
+            provider: 'supabase-cache', status: 'hit',
+          });
+          return { success: true, data: cached as IPGeolocationRecord, source: 'cache' };
+        } else {
+          console.warn(`[AEGIS-GEO] Cached record for ${cleanIp} has invalid coords (${cached.lat}, ${cached.lng}) — deleting and re-fetching.`);
+          await supabase.from('ip_geolocation').delete().eq('ip', cleanIp);
+        }
       }
     } catch (err) {
-      console.warn(`Cache lookup failed for IP ${cleanIp}:`, err);
+      console.warn(`[AEGIS-GEO] Cache lookup failed for IP ${cleanIp}:`, err);
     }
   }
 
-  // Check built-in demo cache ONLY for the known demo IPs (not for real EML IPs)
-  const DEMO_IPS = ['103.253.144.18', '185.220.101.5', '198.51.100.42'];
-  if (DEMO_IPS.includes(cleanIp) && INITIAL_GEO_CACHE[cleanIp]) {
-    return {
-      success: true,
-      data: INITIAL_GEO_CACHE[cleanIp],
-      source: 'cache',
-    };
-  }
-
-  // 3. Call ipinfo.io REST API (or fallback if no token)
   const token = process.env.IPINFO_TOKEN;
-  const url = token 
+  const url = token
     ? `https://ipinfo.io/${encodeURIComponent(cleanIp)}?token=${encodeURIComponent(token)}`
     : `https://ipinfo.io/${encodeURIComponent(cleanIp)}/json`;
 
   try {
-    // AbortController for 5-second timeout so the page doesn't hang
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     const res = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'AEGIS-TRACE-Forensics/1.0',
-      },
-      cache: 'no-store', // Always fetch live — never serve stale geolocation from Vercel cache
+      headers: { Accept: 'application/json', 'User-Agent': 'AEGIS-TRACE-Forensics/2.0' },
+      cache: 'no-store',
       signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
-    if (!res.ok) {
-      throw new Error(`ipinfo HTTP ${res.status}: ${res.statusText}`);
-    }
+    if (!res.ok) throw new Error(`ipinfo HTTP ${res.status}: ${res.statusText}`);
 
     const payload = await res.json();
 
     if (payload.bogon) {
-      const bogonRecord: IPGeolocationRecord = {
-        id: `bogon-${cleanIp}`,
-        ip: cleanIp,
-        lat: 0,
-        lng: 0,
-        city: 'Bogon / Reserved',
-        region: 'Reserved',
-        country: 'Reserved',
-        country_code: 'XX',
-        asn: 'AS-BOGON',
-        isp: 'Unroutable / Bogon IP Space',
-        org: 'Bogon Network',
-        timezone: 'UTC',
-        is_anomalous: true,
-        looked_up_at: new Date().toISOString(),
+      logGeoDebug({ requestedIP: cleanIp, provider: 'ipinfo', status: 'miss' });
+      return {
+        success: false,
+        error: `${cleanIp} is a bogon/unroutable IP — no geolocation available.`,
+        locationUnavailable: true,
+        source: 'unavailable',
       };
-      return { success: true, data: bogonRecord, source: 'ipinfo' };
     }
 
-    // Parse lat/lng from 'loc' ("lat,lng")
-    let lat = 0;
-    let lng = 0;
+    let lat = NaN;
+    let lng = NaN;
     if (payload.loc && typeof payload.loc === 'string') {
       const parts = payload.loc.split(',');
       if (parts.length === 2) {
-        lat = parseFloat(parts[0]) || 0;
-        lng = parseFloat(parts[1]) || 0;
+        lat = parseFloat(parts[0]);
+        lng = parseFloat(parts[1]);
       }
+    }
+
+    if (!isValidCoordinate(lat, lng)) {
+      logGeoDebug({
+        requestedIP: cleanIp, resolvedIP: payload.ip,
+        lat, lng, city: payload.city, country: payload.country,
+        provider: 'ipinfo', status: 'invalid_coords',
+      });
+      return {
+        success: false,
+        error: `Location unavailable — geolocation provider did not return valid coordinates for ${cleanIp}.`,
+        locationUnavailable: true,
+        source: 'unavailable',
+      };
     }
 
     const { asn, isp } = parseASNAndISP(payload.org);
@@ -172,7 +174,7 @@ export async function geolocateIP(ip: string, expectedCountry: string = 'US'): P
       lng,
       city: payload.city || 'Unknown City',
       region: payload.region || 'Unknown Region',
-      country: payload.country || 'Unknown Country',
+      country: payload.country_name || payload.country || 'Unknown Country',
       country_code: countryCode,
       asn,
       isp,
@@ -182,67 +184,50 @@ export async function geolocateIP(ip: string, expectedCountry: string = 'US'): P
       looked_up_at: new Date().toISOString(),
     };
 
-    // 4. Upsert into Supabase cache if configured
+    logGeoDebug({
+      requestedIP: cleanIp, resolvedIP: newRecord.ip,
+      lat: newRecord.lat, lng: newRecord.lng,
+      city: newRecord.city, country: newRecord.country,
+      provider: 'ipinfo', status: 'hit',
+    });
+
     if (supabase) {
       try {
-        await supabase.from('ip_geolocation').upsert({
-          ip: newRecord.ip,
-          lat: newRecord.lat,
-          lng: newRecord.lng,
-          city: newRecord.city,
-          region: newRecord.region,
-          country: newRecord.country,
-          country_code: newRecord.country_code,
-          asn: newRecord.asn,
-          isp: newRecord.isp,
-          org: newRecord.org,
-          timezone: newRecord.timezone,
-          is_anomalous: newRecord.is_anomalous,
-          looked_up_at: newRecord.looked_up_at,
-        }, { onConflict: 'ip' });
+        await supabase.from('ip_geolocation').upsert(
+          {
+            ip: newRecord.ip, lat: newRecord.lat, lng: newRecord.lng,
+            city: newRecord.city, region: newRecord.region,
+            country: newRecord.country, country_code: newRecord.country_code,
+            asn: newRecord.asn, isp: newRecord.isp, org: newRecord.org,
+            timezone: newRecord.timezone, is_anomalous: newRecord.is_anomalous,
+            looked_up_at: newRecord.looked_up_at,
+          },
+          { onConflict: 'ip' }
+        );
       } catch (upsertErr) {
-        console.warn('Failed to upsert IP geolocation into cache:', upsertErr);
+        console.warn('[AEGIS-GEO] Failed to cache IP record:', upsertErr);
       }
     }
 
-    return {
-      success: true,
-      data: newRecord,
-      source: 'ipinfo',
-    };
+    return { success: true, data: newRecord, source: 'ipinfo' };
+
   } catch (apiErr: any) {
-    console.warn(`Geolocation API request failed for ${cleanIp}:`, apiErr);
-
-    // Provide safe deterministic fallback coordinate so map doesn't crash
-    const hash = cleanIp.split('.').reduce((acc, oct) => acc + parseInt(oct || '0', 10), 0);
-    const fallbackRecord: IPGeolocationRecord = {
-      id: `fallback-${cleanIp}`,
-      ip: cleanIp,
-      lat: 50.1109 + (hash % 10) * 0.5,
-      lng: 8.6821 + (hash % 10) * 0.5,
-      city: 'Frankfurt (Telemetry Estimated)',
-      region: 'Hesse',
-      country: 'Germany',
-      country_code: 'DE',
-      asn: 'AS20940',
-      isp: 'Autonomous Relay Host',
-      org: 'AS20940 Akamai Technologies',
-      timezone: 'Europe/Berlin',
-      is_anomalous: true,
-      looked_up_at: new Date().toISOString(),
-    };
-
+    const isTimeout = apiErr?.name === 'AbortError';
+    logGeoDebug({ requestedIP: cleanIp, provider: 'ipinfo', status: 'error' });
+    console.warn(`[AEGIS-GEO] Lookup failed for ${cleanIp}:`, apiErr?.message);
     return {
-      success: true,
-      data: fallbackRecord,
-      error: apiErr?.message || 'Upstream API error, resolved with cached fallback telemetry.',
-      source: 'fallback',
+      success: false,
+      error: isTimeout
+        ? `Location unavailable — request timed out for ${cleanIp}.`
+        : `Location unavailable — geolocation provider did not return valid coordinates for ${cleanIp}.`,
+      locationUnavailable: true,
+      source: 'unavailable',
     };
   }
 }
 
 /**
- * Batch Geolocation resolver with concurrency limiting
+ * Batch resolver. Returns only successful records — failed lookups are omitted, never fake-filled.
  */
 export async function geolocateBatch(
   ips: string[],
@@ -255,9 +240,8 @@ export async function geolocateBatch(
     const chunk = uniqueIps.slice(i, i + concurrencyLimit);
     const promises = chunk.map(async (ip) => {
       const res = await geolocateIP(ip);
-      return res.data;
+      return res.success ? res.data : null;
     });
-
     const chunkResults = await Promise.all(promises);
     for (const record of chunkResults) {
       if (record) results.push(record);

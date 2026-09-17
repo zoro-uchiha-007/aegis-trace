@@ -26,7 +26,13 @@ export const INITIAL_CASE: CaseRecord = { ...STANDBY_CASE };
 
 export const INITIAL_FINDINGS: CaseFindings[] = [];
 
-export const INITIAL_GEO_CACHE: Record<string, IPGeolocationRecord> = {
+/**
+ * DEMO_SCENARIO_GEO_CACHE
+ * Pre-seeded geolocation records for the 3 demo scenario IPs only.
+ * These are NEVER used for real uploaded EML files — those always go through
+ * the live ipinfo.io API in /api/geolocation/[ip].
+ */
+export const DEMO_SCENARIO_GEO_CACHE: Record<string, IPGeolocationRecord> = {
   '103.253.144.18': {
     id: 'geo-sg',
     ip: '103.253.144.18',
@@ -77,6 +83,10 @@ export const INITIAL_GEO_CACHE: Record<string, IPGeolocationRecord> = {
   }
 };
 
+/** @deprecated Use DEMO_SCENARIO_GEO_CACHE — kept for backward compat during transition */
+export const INITIAL_GEO_CACHE = DEMO_SCENARIO_GEO_CACHE;
+
+
 export const INITIAL_HOPS: RouteHop[] = [];
 
 export const INITIAL_IOCS: IOCRecord[] = [];
@@ -94,7 +104,7 @@ export const DEMO_HOPS: RouteHop[] = [
     latency_ms: 142,
     is_anomalous: true,
     relay_label: 'Singapore [SG-TOR-EXIT-01] (Origin)',
-    geo: INITIAL_GEO_CACHE['103.253.144.18']
+    geo: DEMO_SCENARIO_GEO_CACHE['103.253.144.18']
   },
   {
     id: 'hop-2',
@@ -106,7 +116,7 @@ export const DEMO_HOPS: RouteHop[] = [
     latency_ms: 68,
     is_anomalous: false,
     relay_label: 'Amsterdam [NL-RELAY-NODE] (Tor Relay)',
-    geo: INITIAL_GEO_CACHE['185.220.101.5']
+    geo: DEMO_SCENARIO_GEO_CACHE['185.220.101.5']
   },
   {
     id: 'hop-3',
@@ -118,7 +128,7 @@ export const DEMO_HOPS: RouteHop[] = [
     latency_ms: 18,
     is_anomalous: false,
     relay_label: 'Washington D.C. [US-IAD-TARGET] (Victim Gateway)',
-    geo: INITIAL_GEO_CACHE['198.51.100.42']
+    geo: DEMO_SCENARIO_GEO_CACHE['198.51.100.42']
   }
 ];
 
