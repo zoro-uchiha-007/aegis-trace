@@ -74,6 +74,9 @@ export function isPrivateOrReservedIP(ip: string): boolean {
   if (!ip || typeof ip !== 'string') return true;
   const cleanIp = ip.trim();
 
+  // Unspecified / broadcast
+  if (cleanIp === '0.0.0.0' || cleanIp === '255.255.255.255') return true;
+
   // Loopback / localhost
   if (cleanIp === '127.0.0.1' || cleanIp === '::1' || cleanIp.startsWith('127.')) return true;
 
@@ -82,14 +85,23 @@ export function isPrivateOrReservedIP(ip: string): boolean {
   if (cleanIp.startsWith('10.')) return true;
   // 192.168.0.0 - 192.168.255.255
   if (cleanIp.startsWith('192.168.')) return true;
-  // 172.16.0.0 - 172.31.255.255
+  // 192.0.2.0/24 — RFC5737 TEST-NET-1 (documentation)
+  if (cleanIp.startsWith('192.0.2.')) return true;
+
   const parts = cleanIp.split('.').map(Number);
-  if (parts.length === 4) {
+  if (parts.length === 4 && parts.every((p) => !isNaN(p))) {
+    // 172.16.0.0 - 172.31.255.255 (RFC1918)
     if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-    // Carrier-grade NAT 100.64.0.0/10
+    // 100.64.0.0/10 — Carrier-grade NAT
     if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
-    // Link local 169.254.0.0/16
+    // 169.254.0.0/16 — Link local
     if (parts[0] === 169 && parts[1] === 254) return true;
+    // 198.51.100.0/24 — RFC5737 TEST-NET-2 (documentation)
+    if (parts[0] === 198 && parts[1] === 51 && parts[2] === 100) return true;
+    // 203.0.113.0/24 — RFC5737 TEST-NET-3 (documentation)
+    if (parts[0] === 203 && parts[1] === 0 && parts[2] === 113) return true;
+    // 240.0.0.0/4 — Reserved / Future use
+    if (parts[0] >= 240) return true;
   }
 
   return false;

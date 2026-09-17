@@ -48,7 +48,8 @@ export default function DashboardPage() {
   const f1 = findings.find((f) => f.stage === 1) || findings[0];
 
   const handleReset = () => {
-    resetCaseToStandby('CASE-2026-00124');
+    const caseId = getUserCaseId();
+    resetCaseToStandby(caseId);
     loadData();
   };
 

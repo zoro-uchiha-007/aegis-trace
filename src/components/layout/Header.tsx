@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { EvidenceUploadModal } from '@/components/evidence/EvidenceUploadModal';
+import { getUserCaseId } from '@/lib/auth';
 
 interface HeaderProps {
   onToggleMobileMenu?: () => void;
@@ -170,31 +171,31 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
             />
             <div className="flex flex-col gap-1 text-xs">
               <span className="font-label-sm text-on-surface-variant uppercase tracking-wider mb-1">
-                Quick Jump Suggestions
+                Quick Jump
               </span>
               <Link
                 href="/geolocation-threat-infrastructure"
                 onClick={() => setShowSearchModal(false)}
                 className="p-2 rounded bg-surface-container-lowest hover:bg-surface-container flex items-center justify-between"
               >
-                <span className="font-code-sm text-error">103.253.144.18 (Origin Tor Exit - Singapore)</span>
-                <span className="text-on-surface-variant">Hop 1</span>
+                <span className="font-code-sm text-tertiary">Geolocation &amp; Infrastructure Map</span>
+                <span className="text-on-surface-variant">Stage 4</span>
               </Link>
               <Link
                 href="/threat-graph"
                 onClick={() => setShowSearchModal(false)}
                 className="p-2 rounded bg-surface-container-lowest hover:bg-surface-container flex items-center justify-between"
               >
-                <span className="font-code-sm text-secondary">VP-NEURAL-CLONE-CFO-00124 (HiFi-GAN)</span>
-                <span className="text-on-surface-variant">Voice IOC</span>
+                <span className="font-code-sm text-secondary">IOC Threat Graph</span>
+                <span className="text-on-surface-variant">Stage 3</span>
               </Link>
               <Link
                 href="/stage-2-deep-forensics"
                 onClick={() => setShowSearchModal(false)}
                 className="p-2 rounded bg-surface-container-lowest hover:bg-surface-container flex items-center justify-between"
               >
-                <span className="font-code-sm text-primary">corp-bi11ing-us.com (Phishing Lure)</span>
-                <span className="text-on-surface-variant">Domain</span>
+                <span className="font-code-sm text-primary">Deep Forensics &amp; Audio Analysis</span>
+                <span className="text-on-surface-variant">Stage 2</span>
               </Link>
             </div>
           </div>
@@ -205,7 +206,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
       <EvidenceUploadModal
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
-        caseId="CASE-2026-00124"
+        caseId={getUserCaseId()}
       />
     </>
   );

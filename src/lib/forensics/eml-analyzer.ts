@@ -5,9 +5,7 @@ import {
   IOCRecord,
   ThreatGraphEdge,
   RouteHop,
-  IPGeolocationRecord,
 } from '../supabase/types';
-import { INITIAL_GEO_CACHE } from '../services/demo-data';
 
 export interface ForensicAnalysisResult {
   caseRecord: CaseRecord;
@@ -492,36 +490,21 @@ export function analyzeEmailForensics(
   else verdict = 'CRITICAL — Multi-Vector Email Attack Confirmed';
 
   // ── 11. Build route hops ─────────────────────────────────────────────────
-  const routeHops: RouteHop[] = parsed.hops.map((h, idx) => {
-    const geo: IPGeolocationRecord = INITIAL_GEO_CACHE[h.ip] || {
-      id: `geo-${idx}`,
-      ip: h.ip,
-      lat: 37.09 + idx * 5,
-      lng: -95.71 + idx * 10,
-      city: h.fromRaw || `Relay-${idx + 1}`,
-      region: 'Unknown',
-      country: 'Unknown',
-      country_code: 'UN',
-      asn: 'Unknown',
-      isp: h.fromRaw || 'Unknown ISP',
-      org: h.fromRaw || 'Unknown Org',
-      timezone: 'UTC',
-      is_anomalous: h.isAnomalous,
-      looked_up_at: new Date().toISOString(),
-    };
-    return {
-      id: `hop-${idx + 1}`,
-      case_id: caseId,
-      ip: h.ip,
-      hop_order: idx + 1,
-      role: idx === 0 ? 'origin' : idx === parsed.hops.length - 1 ? 'destination' : 'relay',
-      tls_verified: !h.isAnomalous,
-      latency_ms: 30 + idx * 35 + Math.round(Math.random() * 20),
-      is_anomalous: h.isAnomalous,
-      relay_label: `${geo.city} [${geo.country_code}] (${idx === 0 ? 'Origin' : idx === parsed.hops.length - 1 ? 'Destination' : 'Relay'})`,
-      geo,
-    };
-  });
+  // geo is intentionally left as undefined here.
+  // The geolocation page calls GET /api/geolocation/[ip] live for each hop.
+  // This ensures real coordinates from ipinfo.io — never demo/fake data.
+  const routeHops: RouteHop[] = parsed.hops.map((h, idx) => ({
+    id: `hop-${idx + 1}`,
+    case_id: caseId,
+    ip: h.ip,
+    hop_order: idx + 1,
+    role: idx === 0 ? 'origin' : idx === parsed.hops.length - 1 ? 'destination' : 'relay',
+    tls_verified: !h.isAnomalous,
+    latency_ms: 30 + idx * 35 + Math.round(Math.random() * 20),
+    is_anomalous: h.isAnomalous,
+    relay_label: `${h.fromRaw || h.ip} → ${h.byRaw || 'destination'} (${idx === 0 ? 'Origin' : idx === parsed.hops.length - 1 ? 'Destination' : 'Relay'})`,
+    geo: undefined, // resolved live in geolocation page via /api/geolocation/[ip]
+  }));
 
   // ── 12. Threat graph (only add nodes for detected signals) ───────────────
   const nodes: IOCRecord[] = [];
@@ -877,10 +860,10 @@ https://login-update-auth.top/reset?user=analyst
 
 Failure to complete this will result in account lockout.`;
 
-export const SAMPLE_EML_CLEAN = `Received: from mail.trusted-partner.com [203.0.113.10]
+export const SAMPLE_EML_CLEAN = `Received: from mail.trusted-partner.com [130.211.0.10]
 \tby mx.corporate-gateway.com with ESMTPS id legit99281
 \tfor <cfo@aegis-corp.internal>; Wed, 16 Sep 2026 08:30:00 +0000
-Received-SPF: pass (mx.corporate-gateway.com: domain of trusted-partner.com designates 203.0.113.10 as permitted sender)
+Received-SPF: pass (mx.corporate-gateway.com: domain of trusted-partner.com designates 130.211.0.10 as permitted sender)
 Authentication-Results: mx.corporate-gateway.com;
 \tdkim=pass header.i=@trusted-partner.com;
 \tspf=pass smtp.mailfrom=audits@trusted-partner.com;
@@ -902,3 +885,4 @@ Please let us know if there are any specific topics you would like to add to the
 
 Best regards,
 Audit Services Group`;
+

@@ -434,6 +434,7 @@ function LoginForm() {
                     </span>
                   </button>
                 </div>
+                <span className="text-[10px] text-on-surface-variant font-code-sm">Minimum 6 characters</span>
               </div>
 
               <div className="flex flex-col gap-1.5">

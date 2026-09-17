@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { getUserCaseId } from '@/lib/auth';
 
 interface SidebarProps {
   isOpenMobile?: boolean;
@@ -124,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {isAnalyzed ? 'ACTIVE CASE' : 'CASE STANDBY'}
               </span>
               <span className={`font-code-sm text-xs font-bold ${isAnalyzed ? 'text-primary' : 'text-on-surface-variant'}`}>
-                CASE-2026-00124
+                {getUserCaseId()}
               </span>
             </div>
           </div>
