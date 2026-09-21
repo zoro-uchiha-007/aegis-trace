@@ -45,22 +45,53 @@ export const GeoGlobeMap: React.FC<GeoGlobeMapProps> = ({ hops, onSelectHop }) =
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    const mapStyle: maplibregl.StyleSpecification = {
-      version: 8,
-      sources: {
-        'carto-dark': {
-          type: 'raster',
-          tiles: [
-            'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-            'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-            'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN?.trim();
+
+    const mapStyle: maplibregl.StyleSpecification = mapboxToken
+      ? {
+          version: 8,
+          sources: {
+            'mapbox-dark': {
+              type: 'raster',
+              tiles: [
+                `https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}?access_token=${mapboxToken}`,
+              ],
+              tileSize: 512,
+              attribution: '&copy; Mapbox &copy; OpenStreetMap contributors',
+            },
+          },
+          layers: [
+            {
+              id: 'mapbox-dark-layer',
+              type: 'raster',
+              source: 'mapbox-dark',
+              minzoom: 0,
+              maxzoom: 22,
+            },
           ],
-          tileSize: 256,
-          attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-        },
-      },
-      layers: [{ id: 'carto-dark-layer', type: 'raster', source: 'carto-dark', minzoom: 0, maxzoom: 19 }],
-    };
+        }
+      : {
+          version: 8,
+          sources: {
+            'esri-dark': {
+              type: 'raster',
+              tiles: [
+                'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+              ],
+              tileSize: 256,
+              attribution: '&copy; Esri &copy; OpenStreetMap contributors',
+            },
+          },
+          layers: [
+            {
+              id: 'esri-dark-layer',
+              type: 'raster',
+              source: 'esri-dark',
+              minzoom: 0,
+              maxzoom: 16,
+            },
+          ],
+        };
 
     // Center on first plottable hop, or world view if none
     const initialCenter: [number, number] =
