@@ -63,11 +63,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const pathname = usePathname();
 
   const [isAnalyzed, setIsAnalyzed] = React.useState(false);
+  // Initialize empty to match server render — populated client-side only to avoid hydration mismatch
+  const [caseId, setCaseId] = React.useState('');
 
   React.useEffect(() => {
+    // Safe to read cookie/localStorage now that we're on the client
+    setCaseId(getUserCaseId());
+
     const checkStatus = async () => {
       const { isCaseAnalyzed } = await import('@/lib/services/cases');
       setIsAnalyzed(isCaseAnalyzed());
+      setCaseId(getUserCaseId());
     };
     checkStatus();
     window.addEventListener('aegis-case-updated', checkStatus);
@@ -125,7 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {isAnalyzed ? 'ACTIVE CASE' : 'CASE STANDBY'}
               </span>
               <span className={`font-code-sm text-xs font-bold ${isAnalyzed ? 'text-primary' : 'text-on-surface-variant'}`}>
-                {getUserCaseId()}
+                {caseId || '—'}
               </span>
             </div>
           </div>

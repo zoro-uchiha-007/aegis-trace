@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { EvidenceUploadModal } from '@/components/evidence/EvidenceUploadModal';
 import { getUserCaseId } from '@/lib/auth';
@@ -14,6 +14,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  // Empty initial value matches SSR — populated client-side only to avoid hydration mismatch
+  const [caseId, setCaseId] = useState('');
+
+  useEffect(() => {
+    setCaseId(getUserCaseId());
+  }, []);
 
   const notifications = [
     { id: 1, title: 'Multi-Vector Anomaly Detected', time: '4m ago', type: 'critical' },
@@ -206,7 +212,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileMenu }) => {
       <EvidenceUploadModal
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
-        caseId={getUserCaseId()}
+        caseId={caseId}
       />
     </>
   );
