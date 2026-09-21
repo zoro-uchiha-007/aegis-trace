@@ -75,7 +75,8 @@ export const GmailInboxPanel: React.FC<GmailInboxPanelProps> = ({ onEmailAnalyze
       clean.searchParams.delete('gmail_email');
       window.history.replaceState({}, '', clean.toString());
     } else if (gmailError) {
-      setInboxError(`Gmail connection failed: ${gmailError.replace(/_/g, ' ')}`);
+      const decoded = decodeURIComponent(gmailError).replace(/_/g, ' ');
+      setInboxError(`Gmail connection failed: ${decoded}`);
       const clean = new URL(window.location.href);
       clean.searchParams.delete('gmail_error');
       window.history.replaceState({}, '', clean.toString());

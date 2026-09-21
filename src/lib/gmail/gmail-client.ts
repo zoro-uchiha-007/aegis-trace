@@ -53,48 +53,23 @@ export function isGmailConnected(): boolean {
   return getGmailToken() !== null;
 }
 
-// ─── OAuth PKCE Flow ──────────────────────────────────────────────────────────
-
-function generateCodeVerifier(): string {
-  const array = new Uint8Array(64);
-  crypto.getRandomValues(array);
-  return btoa(String.fromCharCode(...Array.from(array)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
-
-async function generateCodeChallenge(verifier: string): Promise<string> {
-  const data = new TextEncoder().encode(verifier);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return btoa(String.fromCharCode(...Array.from(new Uint8Array(digest))))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
-
 export async function initiateGmailOAuth() {
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim();
   if (!clientId) throw new Error('Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID in .env.local');
 
-  const verifier = generateCodeVerifier();
-  const challenge = await generateCodeChallenge(verifier);
-
-  // Store verifier for callback
-  sessionStorage.setItem('aegis_pkce_verifier', verifier);
+  const redirectUri = `${window.location.origin}/api/gmail/auth`;
 
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri,
     response_type: 'code',
     scope: GMAIL_SCOPES,
-    code_challenge: challenge,
-    code_challenge_method: 'S256',
     access_type: 'offline',
     prompt: 'consent',
+    state: redirectUri,
   });
 
-  window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
 // ─── Gmail API Calls ──────────────────────────────────────────────────────────
