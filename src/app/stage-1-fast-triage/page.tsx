@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { RiskGauge } from '@/components/forensics/RiskGauge';
 import { EvidenceUploadModal } from '@/components/evidence/EvidenceUploadModal';
 import { EmlIngestionDropzone } from '@/components/evidence/EmlIngestionDropzone';
+import { GmailInboxPanel } from '@/components/evidence/GmailInboxPanel';
 import { 
   fetchCurrentCase, 
   fetchCaseFindings, 
@@ -112,21 +113,44 @@ export default function Stage1FastTriagePage() {
         </div>
       </div>
 
-      {/* If Standby / Unanalyzed: Show Clean Dropzone */}
+      {/* If Standby / Unanalyzed: Show Ingestion Options */}
       {!isAnalyzed ? (
         <div className="flex flex-col gap-6">
-          <div className="bg-surface-container rounded-2xl p-8 border border-outline-variant/20 shadow-md flex flex-col items-center text-center">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4 border border-primary/20">
-              <span className="material-symbols-outlined text-3xl">bolt</span>
+          {/* Page heading */}
+          <div className="flex items-center gap-4 px-1">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 flex-shrink-0">
+              <span className="material-symbols-outlined text-2xl">bolt</span>
             </div>
-            <h2 className="font-headline-sm text-xl font-bold text-on-surface">
-              Stage 1: Fast Email Authentication &amp; Multi-Vector Triage
-            </h2>
-            <p className="text-sm text-on-surface-variant max-w-xl mt-1 mb-6">
-              Drop an <code className="text-primary font-mono font-bold">.EML</code> file or select a sample below to parse SPF/DKIM/DMARC headers, evaluate lookalike domains, and dynamically calculate the multi-vector risk score.
-            </p>
+            <div>
+              <h2 className="font-headline-sm text-xl font-bold text-on-surface">
+                Stage 1: Fast Email Authentication &amp; Multi-Vector Triage
+              </h2>
+              <p className="text-sm text-on-surface-variant mt-0.5">
+                Upload <code className="text-primary font-mono font-bold">.EML</code> files manually, or connect Gmail to analyze inbox emails live without any export.
+              </p>
+            </div>
+          </div>
 
-            <EmlIngestionDropzone onAnalyzed={() => loadData()} className="w-full max-w-2xl text-left" />
+          {/* Two-column layout: EML upload | Gmail inbox */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {/* Left: EML Multi-file Dropzone */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 px-1">
+                <span className="material-symbols-outlined text-primary text-sm">upload_file</span>
+                <span className="text-xs font-bold text-on-surface uppercase tracking-wider font-code-sm">Upload .EML Files</span>
+              </div>
+              <EmlIngestionDropzone onAnalyzed={() => loadData()} className="w-full" />
+            </div>
+
+            {/* Right: Gmail Live Inbox */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 px-1">
+                <span className="material-symbols-outlined text-tertiary text-sm">inbox</span>
+                <span className="text-xs font-bold text-on-surface uppercase tracking-wider font-code-sm">Gmail Live Inbox</span>
+                <span className="px-1.5 py-0.5 rounded bg-tertiary/10 text-tertiary border border-tertiary/20 text-[10px] font-bold font-mono">LIVE</span>
+              </div>
+              <GmailInboxPanel onEmailAnalyzed={() => loadData()} />
+            </div>
           </div>
         </div>
       ) : (
