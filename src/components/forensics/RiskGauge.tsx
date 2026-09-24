@@ -69,7 +69,10 @@ export const RiskGauge: React.FC<RiskGaugeProps> = ({
 
         {/* Center Text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <span className="font-display-lg text-display-lg font-extrabold text-error tracking-tight leading-none">
+          <span
+            className="font-display-lg text-display-lg font-extrabold tracking-tight leading-none"
+            style={{ color: strokeColor }}
+          >
             {currentScore}
           </span>
           <span className="font-code-sm text-code-sm text-outline uppercase tracking-wider font-semibold mt-1">

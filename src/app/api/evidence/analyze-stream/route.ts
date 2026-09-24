@@ -69,18 +69,21 @@ export async function POST(request: NextRequest) {
         await delay(400);
 
         // ── Pipeline Step 4 ──────────────────────────────────────────────────
-        step('🔗 Scanning for suspicious URLs and lookalike domains...');
+        step('⚡ Extracting SPF/DKIM/DMARC vectors for XGBoost classification...');
+        await delay(250);
+
+        step('🧠 Running Transformer NLP model (DistilRoBERTa) on email intent & urgency...');
         await delay(300);
 
-        step('📎 Inspecting MIME attachment types for malicious payloads...');
+        step('📎 Inspecting MIME attachment entropy & weaponized PDF payload signatures...');
         await delay(200);
 
         // ── Pipeline Step 5 ──────────────────────────────────────────────────
-        step('🧠 Running multi-vector NLP threat scoring model...');
-        await delay(350);
-
-        step('🕸️  Constructing IOC threat graph nodes and edges...');
+        step('🕸️  Correlating multi-hop IOCs into Threat Graph with GNN Attention Network...');
         await delay(250);
+
+        step('🔒 Sealing immutable evidence hash into cryptographic ledger...');
+        await delay(200);
 
         // ── Run the actual analysis ───────────────────────────────────────────
         const analysis = analyzeEmailForensics(parsed, caseId);

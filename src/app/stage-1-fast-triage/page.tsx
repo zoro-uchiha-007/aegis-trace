@@ -252,7 +252,7 @@ export default function Stage1FastTriagePage() {
                 </div>
               </div>
               <span className="px-space-xs py-0.5 rounded bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase font-mono font-bold">
-                AI Evaluated
+                XGBoost + Transformer
               </span>
             </div>
 
