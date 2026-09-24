@@ -503,6 +503,18 @@ export const GmailInboxPanel: React.FC<GmailInboxPanelProps> = ({ onEmailAnalyze
                     );
                   })}
                 </div>
+
+                {streamResult.riskScore > 50 && (
+                  <div className="mt-2.5 pt-2 border-t border-outline-variant/15 flex items-center justify-between">
+                    <span className="text-[10px] text-on-surface-variant font-code-sm">Safety Intervention:</span>
+                    <a
+                      href="/safety-intervention?url=https%3A%2F%2Fcorp-bi11ing-us.com%2Flogin%3Fauth%3Dcfo_wire&reason=greedy_click_intercepted"
+                      className="px-2 py-0.5 rounded bg-error text-on-error font-mono text-[10px] font-bold hover:bg-error-container hover:text-on-error-container transition-all flex items-center gap-1 shadow-sm"
+                    >
+                      <span>Test Intercept →</span>
+                    </a>
+                  </div>
+                )}
               </div>
             )}
           </div>

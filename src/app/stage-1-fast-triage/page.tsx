@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { RiskGauge } from '@/components/forensics/RiskGauge';
 import { EvidenceUploadModal } from '@/components/evidence/EvidenceUploadModal';
@@ -280,7 +281,16 @@ export default function Stage1FastTriagePage() {
                 ) : null}
                 <div className="flex items-center justify-between">
                   <span className="text-on-surface font-medium">Sender Domain:</span>
-                  <span className="text-error font-mono">{details.spoofed_domain || 'sender-domain.com'}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-error font-mono">{details.spoofed_domain || 'sender-domain.com'}</span>
+                    <Link
+                      href={`/safety-intervention?url=${encodeURIComponent('https://' + (details.spoofed_domain || 'corp-bi11ing-us.com'))}&reason=greedy_click_intercepted`}
+                      className="px-1.5 py-0.5 rounded bg-error/10 hover:bg-error/20 text-error text-[10px] font-mono font-bold border border-error/20 transition-all"
+                      title="Simulate user clicking flagged link - Triggers Safety Intervention"
+                    >
+                      Test Intercept
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
@@ -291,7 +301,7 @@ export default function Stage1FastTriagePage() {
                 <span className={`font-headline-sm text-headline-sm font-bold ${
                   details.deepfake_voice_pct ? 'text-secondary' : 'text-on-surface-variant'
                 }`}>
-                  Voice Analysis: {details.deepfake_voice_pct ? `${details.deepfake_voice_pct}% AI-Generated Voice` : 'No Audio Recording Attached'}
+                  Voice Analysis: {details.deepfake_voice_pct ? `${details.deepfake_voice_pct}% AI-Generated Voice (Pitch F0 Anomaly)` : 'No Audio Recording Attached'}
                 </span>
                 {!details.deepfake_voice_pct && (
                   <button

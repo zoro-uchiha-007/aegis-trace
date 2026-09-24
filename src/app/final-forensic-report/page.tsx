@@ -44,9 +44,9 @@ export default function FinalForensicReportPage() {
   }, []);
 
   const handleSealAndClose = async () => {
-    setIsSealing(true);
+    const caseId = getUserCaseId();
     await updateCaseStatus(
-      'CASE-2026-00124',
+      caseId,
       disposition === 'inconclusive' ? 'closed' : 'quarantined',
       `FIPS 140-3 Hardware Cryptographic Seal Applied. Disposition: ${disposition.toUpperCase()}. Case archived.`
     );

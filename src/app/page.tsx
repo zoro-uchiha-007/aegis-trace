@@ -242,7 +242,7 @@ export default function DashboardPage() {
           <span className="font-code-sm text-xs text-on-surface-variant">Stitch UI 6-Stage Pipeline</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-space-md">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-space-md">
           {[
             {
               stage: 'Stage 1',
@@ -255,7 +255,7 @@ export default function DashboardPage() {
             {
               stage: 'Stage 2',
               title: 'Deep Forensics',
-              desc: 'Audio spectrum deconstruction & malicious invoice attachment.',
+              desc: 'Pitch F0 acoustic analysis & payload YARA malware scanning.',
               href: '/stage-2-deep-forensics',
               icon: 'smb_share',
               color: 'text-primary border-primary/30',
@@ -271,13 +271,21 @@ export default function DashboardPage() {
             {
               stage: 'Stage 4',
               title: 'Geolocation',
-              desc: 'Geodesic map tracing hops across international relays.',
+              desc: 'Geodesic map with offline Autonomous System fallback resiliency.',
               href: '/geolocation-threat-infrastructure',
               icon: 'public',
               color: 'text-tertiary border-tertiary/30',
             },
             {
               stage: 'Stage 5',
+              title: 'Safety Intercept',
+              desc: 'Greedy user click interception & isolated web quarantine sandbox.',
+              href: '/safety-intervention',
+              icon: 'gshield',
+              color: 'text-error border-error/30',
+            },
+            {
+              stage: 'Stage 6',
               title: 'Final Report',
               desc: 'Cryptographically sealed forensic incident report.',
               href: '/final-forensic-report',

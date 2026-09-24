@@ -42,11 +42,16 @@ const navItems = [
     color: 'text-tertiary',
   },
   {
+    name: 'Safety Intervention',
+    href: '/safety-intervention',
+    icon: 'gshield',
+    color: 'text-error',
+  },
+  {
     name: 'Evidence Vault',
     href: '/evidence-vault',
     icon: 'lock',
     color: 'text-error',
-    badge: 'NEW',
   },
   {
     name: 'Final Forensic Report',
@@ -155,11 +160,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {item.icon}
                   </span>
                   <span className="font-body-md text-body-md flex-1">{item.name}</span>
-                  {'badge' in item && item.badge && (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono bg-primary/10 text-primary border border-primary/20">
-                      {item.badge}
-                    </span>
-                  )}
                 </Link>
               );
             })}

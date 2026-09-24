@@ -279,6 +279,34 @@ export async function fetchAuditLogs(caseId: string = 'CASE-2026-00124'): Promis
   return clientAuditLogsState;
 }
 
+export async function logAuditEvent(
+  caseId: string,
+  actor: string,
+  action: string
+): Promise<AuditLogRecord> {
+  const newLog: AuditLogRecord = {
+    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    case_id: caseId,
+    actor,
+    action,
+    created_at: new Date().toISOString(),
+  };
+
+  clientAuditLogsState.unshift(newLog);
+  saveToLocalStorage();
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.from('audit_log').insert(newLog);
+    } catch (err) {
+      console.warn('Failed to insert audit log to Supabase:', err);
+    }
+  }
+
+  return newLog;
+}
+
 /**
  * Ingests an RFC-822 .eml string, parses headers, runs multi-vector threat engine,
  * computes dynamic score, route hops, IOC threat graph, and updates system state.

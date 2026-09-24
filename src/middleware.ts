@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 /** Routes that do NOT require authentication (public routes) */
-const PUBLIC_ROUTES = ['/login'];
+const PUBLIC_ROUTES = ['/login', '/safety-intervention'];
 
 // ─── Load Balancer ────────────────────────────────────────────────────────────
 

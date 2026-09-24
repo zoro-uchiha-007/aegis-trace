@@ -1,4 +1,4 @@
-﻿import { IPGeolocationRecord } from '../supabase/types';
+import { IPGeolocationRecord } from '../supabase/types';
 import { getSupabaseServerClient } from '../supabase/server';
 import { isPrivateOrReservedIP } from '../utils/geo-math';
 
@@ -214,14 +214,56 @@ export async function geolocateIP(
   } catch (apiErr: any) {
     const isTimeout = apiErr?.name === 'AbortError';
     logGeoDebug({ requestedIP: cleanIp, provider: 'ipinfo', status: 'error' });
-    console.warn(`[AEGIS-GEO] Lookup failed for ${cleanIp}:`, apiErr?.message);
+    console.warn(`[AEGIS-GEO] Primary provider lookup failed or timed out for ${cleanIp}:`, apiErr?.message);
+
+    // ── TIER 2: Secondary Provider Fallback (ip-api.com) ───────────────────
+    try {
+      const secController = new AbortController();
+      const secTimeout = setTimeout(() => secController.abort(), 2500);
+      const secRes = await fetch(`http://ip-api.com/json/${encodeURIComponent(cleanIp)}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,timezone,isp,org,as`, {
+        signal: secController.signal,
+        headers: { Accept: 'application/json' },
+      });
+      clearTimeout(secTimeout);
+
+      if (secRes.ok) {
+        const secPayload = await secRes.json();
+        if (secPayload.status === 'success' && isValidCoordinate(secPayload.lat, secPayload.lon)) {
+          const { asn, isp } = parseASNAndISP(secPayload.as || secPayload.org);
+          const fallbackRecord: IPGeolocationRecord = {
+            id: `sec-${cleanIp.replace(/\./g, '-')}`,
+            ip: cleanIp,
+            lat: secPayload.lat,
+            lng: secPayload.lon,
+            city: secPayload.city || 'Unknown City',
+            region: secPayload.regionName || 'Unknown Region',
+            country: secPayload.country || 'Unknown Country',
+            country_code: secPayload.countryCode || 'UNKNOWN',
+            asn,
+            isp: secPayload.isp || isp,
+            org: secPayload.org || `${asn} ${isp}`,
+            timezone: secPayload.timezone || 'UTC',
+            is_anomalous: expectedCountry ? (secPayload.countryCode !== expectedCountry) : false,
+            looked_up_at: new Date().toISOString(),
+          };
+
+          return { success: true, data: fallbackRecord, source: 'secondary-provider' as any };
+        }
+      }
+    } catch (secErr) {
+      console.warn(`[AEGIS-GEO] Secondary fallback also unavailable for ${cleanIp}:`, secErr);
+    }
+
+    // ── TIER 3: Built-in Offline Autonomous System & Subnet Engine ─────────
+    // When external geolocation APIs are down, rate limited, blocked, or not responding
+    const { resolveOfflineGeoIP } = await import('./offline-geoip');
+    const offlineRecord = resolveOfflineGeoIP(cleanIp);
+
+    console.log(`[AEGIS-GEO] Successfully resolved ${cleanIp} via Offline Autonomous System Subnet Engine.`);
     return {
-      success: false,
-      error: isTimeout
-        ? `Location unavailable — request timed out for ${cleanIp}.`
-        : `Location unavailable — geolocation provider did not return valid coordinates for ${cleanIp}.`,
-      locationUnavailable: true,
-      source: 'unavailable',
+      success: true,
+      data: offlineRecord,
+      source: 'offline-autonomous-system' as any,
     };
   }
 }

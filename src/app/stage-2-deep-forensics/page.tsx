@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { WaveformVisualizer } from '@/components/forensics/WaveformVisualizer';
+import { MalwareScanner } from '@/components/forensics/MalwareScanner';
 import { EvidenceUploadModal } from '@/components/evidence/EvidenceUploadModal';
 import { EmlIngestionDropzone } from '@/components/evidence/EmlIngestionDropzone';
 import { fetchCurrentCase, fetchCaseFindings } from '@/lib/services/cases';
@@ -223,7 +224,7 @@ export default function Stage2DeepForensicsPage() {
               </div>
 
               <div className="flex flex-col gap-space-md">
-                {/* Fake Login Link */}
+                {/* Fake Login Link with Safety Intercept */}
                 <div className="bg-surface-container p-space-md rounded-lg flex flex-col gap-space-xs border border-outline-variant/15">
                   <div className="flex items-center justify-between">
                     <span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">
@@ -233,11 +234,19 @@ export default function Stage2DeepForensicsPage() {
                       Phishing
                     </span>
                   </div>
-                  <div className="font-code-sm text-code-sm text-error font-semibold pt-1 break-all">
-                    {details.phishing_url || 'https://corp-bi11ing-us.com/login?auth=cfo_wire'}
+                  <div className="font-code-sm text-code-sm text-error font-semibold pt-1 break-all flex items-center justify-between gap-2">
+                    <span>{details.phishing_url || 'https://corp-bi11ing-us.com/login?auth=cfo_wire'}</span>
+                    <Link
+                      href={`/safety-intervention?url=${encodeURIComponent(details.phishing_url || 'https://corp-bi11ing-us.com/login?auth=cfo_wire')}&reason=greedy_click_intercepted`}
+                      className="px-2 py-0.5 rounded bg-error text-on-error font-bold text-[10px] hover:bg-error-container hover:text-on-error-container transition-all flex items-center gap-1 whitespace-nowrap shadow-sm"
+                      title="Simulate user clicking flagged link - Triggers Safety Intervention"
+                    >
+                      <span className="material-symbols-outlined text-[12px]">security</span>
+                      <span>Simulate Click</span>
+                    </Link>
                   </div>
                   <div className="font-code-sm text-code-sm text-on-surface-variant mt-space-xs">
-                    Leads to credential harvester designed to steal Active Directory executive session tokens.
+                    Leads to credential harvester designed to steal Active Directory executive session tokens. (Safety Intervention will intercept any click).
                   </div>
                 </div>
 
@@ -248,7 +257,7 @@ export default function Stage2DeepForensicsPage() {
                       Attachment Payload
                     </span>
                     <span className="px-space-xs py-0.5 rounded bg-error/20 text-error font-label-sm font-bold border border-error/30">
-                      Attachment Check
+                      Exploit Detected
                     </span>
                   </div>
                   <div className="flex items-center justify-between pt-1">
@@ -284,6 +293,9 @@ export default function Stage2DeepForensicsPage() {
               </div>
             </section>
           </div>
+
+          {/* Deep Malware & Payload Sandbox Scanner */}
+          <MalwareScanner />
 
           {/* 3. Forensic Progression Action Bar */}
           <section className="w-full bg-surface-container-low rounded-xl p-space-lg shadow-sm flex flex-col sm:flex-row items-center justify-between gap-space-md border border-outline-variant/15">
